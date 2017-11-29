@@ -43,14 +43,17 @@ public class RemoteEjbConfig {
         return Collections.unmodifiableList(remoteEjbs);
     }
 
+
     public static class RemoteEjb {
         private final Class<?> remoteInterface;
         private final String ejbName;
+        private final boolean stateful;
 
 
-        public RemoteEjb(Class<?> remoteInterface, String ejbName) {
+        public RemoteEjb(Class<?> remoteInterface, String ejbName, boolean stateful) {
             this.remoteInterface = remoteInterface;
             this.ejbName = ejbName;
+            this.stateful = stateful;
         }
 
         public Class<?> getRemoteInterface() {
@@ -59,6 +62,10 @@ public class RemoteEjbConfig {
 
         public String getEjbName() {
             return ejbName;
+        }
+
+        public boolean isStateful() {
+            return stateful;
         }
     }
 }

@@ -62,6 +62,9 @@ public class RemoteEjbInjectionExtension implements Extension {
                     sb.append("/");
                 }
                 sb.append("/").append(ejb.getEjbName()).append("!").append(ejb.getRemoteInterface().getName());
+                if(ejb.isStateful()) {
+                    sb.append("?stateful");
+                }
                 String lookup = sb.toString();
                 event.addBean(new Bean<Object>() {
                     public Class<?> getBeanClass() {
@@ -81,7 +84,9 @@ public class RemoteEjbInjectionExtension implements Extension {
                             final Properties env = new Properties();
                             env.put(Context.INITIAL_CONTEXT_FACTORY, "org.wildfly.naming.client.WildFlyInitialContextFactory");
                             env.put("remote.connectionprovider.create.options.org.xnio.Options.SSL_ENABLED", "false");
-                            env.put(Context.PROVIDER_URL, rc.getProviderUri());
+                            if(rc.getProviderUri() != null) {
+                                env.put(Context.PROVIDER_URL, rc.getProviderUri());
+                            }
                             InitialContext namingContext = new InitialContext(env);
                             return namingContext.lookup(lookup);
                         } catch (Exception e) {

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ejb-injection xmlns="urn:jboss:remote-ejb-injection:1.0">
+    <ejbs provider-uri="remote+http://localhost:8080" module="test" >
+        <ejb interface-class="org.wildfly.remoteejbinjection.ejbs.StatelessEjbInterface" ejb-name="StatelessEjb" />
+        <ejb interface-class="org.wildfly.remoteejbinjection.ejbs.StatefulEjbInterface" ejb-name="StatefulEjb" stateful="true" />
+    </ejbs>
+</ejb-injection>

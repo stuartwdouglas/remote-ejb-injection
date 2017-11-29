@@ -41,7 +41,7 @@
         <xsd:sequence>
             <xsd:element name="ejb" type="ejbType" minOccurs="1" maxOccurs="unbounded"/>
         </xsd:sequence>
-        <xsd:attribute name="provider-uri" type="xsd:string" use="required"/>
+        <xsd:attribute name="provider-uri" type="xsd:string"/>
         <xsd:attribute name="module" type="xsd:token" use="required"/>
         <xsd:attribute name="app" type="xsd:token"/>
         <xsd:attribute name="distinct" type="xsd:token"/>
@@ -51,6 +51,7 @@
     <xsd:complexType name="ejbType">
         <xsd:attribute name="interface-class" type="xsd:token" use="required"/>
         <xsd:attribute name="ejb-name" type="xsd:string" use="required"/>
+        <xsd:attribute name="stateful" type="xsd:boolean" default="false"/>
     </xsd:complexType>
 </xsd:schema>
 

@@ -26,6 +26,7 @@ class RemoteEjbInjectionParser {
     static final String EJB = "ejb";
     static final String INTERFACE_CLASS = "interface-class";
     static final String EJB_NAME = "ejb-name";
+    static final String STATEFUL = "stateful";
 
     static List<RemoteEjbConfig> parse(URL url) throws XMLStreamException, IOException, ClassNotFoundException {
         try (InputStream inputStream = url.openStream()) {
@@ -98,7 +99,6 @@ class RemoteEjbInjectionParser {
 
         Set<String> required = new HashSet<>();
         required.add(MODULE);
-        required.add(PROVIDER_URI);
         // parse the permissions required.
         for(int i = 0; i < reader.getAttributeCount(); ++i) {
             String name = reader.getAttributeLocalName(i);
@@ -158,6 +158,7 @@ class RemoteEjbInjectionParser {
 
         String interfaceClass = null;
         String ejbName = null;
+        boolean stateful = false;
         List<RemoteEjbConfig.RemoteEjb> remoteEjbs = new ArrayList<>();
 
         Set<String> required = new HashSet<>();
@@ -177,6 +178,10 @@ class RemoteEjbInjectionParser {
                     ejbName = value;
                     break;
                 }
+                case STATEFUL: {
+                    stateful = Boolean.parseBoolean(value);
+                    break;
+                }
             }
         }
         if(!required.isEmpty()) {
@@ -187,7 +192,7 @@ class RemoteEjbInjectionParser {
         while (reader.hasNext()) {
             switch (reader.nextTag()) {
                 case XMLStreamConstants.END_ELEMENT: {
-                    return new RemoteEjbConfig.RemoteEjb(Thread.currentThread().getContextClassLoader().loadClass(interfaceClass), ejbName);
+                    return new RemoteEjbConfig.RemoteEjb(Thread.currentThread().getContextClassLoader().loadClass(interfaceClass), ejbName, stateful);
                 }
                 case XMLStreamConstants.START_ELEMENT: {
                     String element = reader.getLocalName();
