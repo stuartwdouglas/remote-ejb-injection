@@ -9,15 +9,34 @@ import java.util.List;
 public class RemoteEjbConfig {
 
     private final String providerUri;
+    private final String app;
+    private final String module;
+    private final String distinct;
+
     private final List<RemoteEjb> remoteEjbs;
 
-    public RemoteEjbConfig(String providerUri, List<RemoteEjb> remoteEjbs) {
+    public RemoteEjbConfig(String providerUri, String app, String module, String distinct, List<RemoteEjb> remoteEjbs) {
         this.providerUri = providerUri;
+        this.app = app;
+        this.module = module;
+        this.distinct = distinct;
         this.remoteEjbs = remoteEjbs;
     }
 
     public String getProviderUri() {
         return providerUri;
+    }
+
+    public String getApp() {
+        return app;
+    }
+
+    public String getModule() {
+        return module;
+    }
+
+    public String getDistinct() {
+        return distinct;
     }
 
     public List<RemoteEjb> getRemoteEjbs() {
@@ -26,19 +45,20 @@ public class RemoteEjbConfig {
 
     public static class RemoteEjb {
         private final Class<?> remoteInterface;
-        private final String lookup;
+        private final String ejbName;
 
-        public RemoteEjb(Class<?> remoteInterface, String lookup) {
+
+        public RemoteEjb(Class<?> remoteInterface, String ejbName) {
             this.remoteInterface = remoteInterface;
-            this.lookup = lookup;
+            this.ejbName = ejbName;
         }
 
         public Class<?> getRemoteInterface() {
             return remoteInterface;
         }
 
-        public String getLookup() {
-            return lookup;
+        public String getEjbName() {
+            return ejbName;
         }
     }
 }

@@ -14,12 +14,149 @@
     <artifactId>remote-ejb-injection</artifactId>
     <version>1.0-SNAPSHOT</version>
 
+    <properties>
+        <arquillian.version>1.1.13.Final</arquillian.version>
+        <cdi-api.version>1.2</cdi-api.version>
+        <junit.version>4.12</junit.version>
+        <maven-surefire-plugin.version>2.20</maven-surefire-plugin.version>
+        <wildfly-arquillian-container-managed.version>2.1.0.Final</wildfly-arquillian-container-managed.version>
+        <wildfly-server-provisioning-maven-plugin.version>1.2.2.Final</wildfly-server-provisioning-maven-plugin.version>
+
+
+        <jboss.vm.args>-ea</jboss.vm.args>
+        <redirectTestOutput>true</redirectTestOutput>
+        <jboss-ejb-api_3.2_spec.version>1.0.0.Final</jboss-ejb-api_3.2_spec.version>
+        <httpclient.version>4.5.3</httpclient.version>
+        <jboss-servlet-api_3.1_spec.version>1.0.0.Final</jboss-servlet-api_3.1_spec.version>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>javax.enterprise</groupId>
             <artifactId>cdi-api</artifactId>
-            <version>1.2</version>
+            <version>${cdi-api.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.wildfly.arquillian</groupId>
+            <artifactId>wildfly-arquillian-container-managed</artifactId>
+            <version>${wildfly-arquillian-container-managed.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.jboss.arquillian.junit</groupId>
+            <artifactId>arquillian-junit-container</artifactId>
+            <version>${arquillian.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.jboss.spec.javax.ejb</groupId>
+            <artifactId>jboss-ejb-api_3.2_spec</artifactId>
+            <version>${jboss-ejb-api_3.2_spec.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.jboss.arquillian.testenricher</groupId>
+            <artifactId>arquillian-testenricher-cdi</artifactId>
+            <version>${arquillian.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+            <version>${httpclient.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.jboss.spec.javax.servlet</groupId>
+            <artifactId>jboss-servlet-api_3.1_spec</artifactId>
+            <version>${jboss-servlet-api_3.1_spec.version}</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
+    <build>
+        <testResources>
+            <testResource>
+                <directory>src/test/resources</directory>
+            </testResource>
+            <testResource>
+                <directory>src/test/java</directory>
+            </testResource>
+        </testResources>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>integration-tests</id>
+                        <phase>integration-test</phase>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                        <configuration>
+                            <redirectTestOutputToFile>${redirectTestOutput}</redirectTestOutputToFile>
+                            <skip>false</skip>
+                            <excludes>
+                                <exclude>none</exclude>
+                            </excludes>
+                            <includes>
+                                <include>**/*.java</include>
+                            </includes>
+                            <forkMode>once</forkMode>
+                            <systemPropertyVariables>
+                                <jboss.home>${project.build.directory}/wildfly</jboss.home>
+                                <project.build.directory>${project.build.directory}</project.build.directory>
+                                <jboss.vm.args>${jboss.vm.args}</jboss.vm.args>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.wildfly.build</groupId>
+                <artifactId>wildfly-server-provisioning-maven-plugin</artifactId>
+                <version>${wildfly-server-provisioning-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>server-provisioning</id>
+                        <goals>
+                            <goal>build</goal>
+                        </goals>
+
+                        <phase>process-test-resources</phase>
+                        <configuration>
+                            <config-file>server-provisioning.xml</config-file>
+                            <server-name>wildfly</server-name>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <profile>
+            <id>debug</id>
+            <activation>
+                <property>
+                    <name>debug</name>
+                </property>
+            </activation>
+            <properties>
+                <jboss.vm.args>-ea -Xdebug -Xnoagent -Djava.compiler=NONE -Xrunjdwp:transport=dt_socket,address=5005,server=y,suspend=y</jboss.vm.args>
+            </properties>
+        </profile>
+    </profiles>
 </project>

@@ -1,53 +1,84 @@
 package org.wildfly.remoteejbinjection;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
+
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
-import java.io.InputStream;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * @author Stuart Douglas
  */
-public class RemoteEjbInjectionParser {
+class RemoteEjbInjectionParser {
 
+    static final String PROVIDER_URI = "provider-uri";
+    static final String MODULE = "module";
+    static final String APP = "app";
+    static final String DISTINCT = "distinct";
+    static final String EJB = "ejb";
+    static final String INTERFACE_CLASS = "interface-class";
+    static final String EJB_NAME = "ejb-name";
 
-    public void parse(URL url) {
+    static List<RemoteEjbConfig> parse(URL url) throws XMLStreamException, IOException, ClassNotFoundException {
         try (InputStream inputStream = url.openStream()) {
             final XMLInputFactory inputFactory = XMLInputFactory.newInstance();
-            XMLStreamReader xmlReader = inputFactory.createXMLStreamReader(inputStream);
-            parse(xmlReader);
-        } catch (Exception e) {
-            throw new RuntimeException(e.getMessage(), e);
+            XMLStreamReader reader = inputFactory.createXMLStreamReader(inputStream);
+            reader.require(XMLStreamConstants.START_DOCUMENT, null, null);
+
+            while (reader.hasNext()) {
+                switch (reader.nextTag()) {
+                    case XMLStreamConstants.START_ELEMENT: {
+                        String element = reader.getLocalName();
+                        switch (element) {
+                            case "ejb-injection": {
+                                return parseEjbInjection(reader);
+                            }
+                            default: {
+                                throw unexpectedElement(reader);
+                            }
+                        }
+                    }
+                    default: {
+                        throw unexpectedContent(reader);
+                    }
+                }
+            }
+            throw unexpectedEndOfDocument(reader);
         }
     }
 
 
-    public static List<PermissionFactory> parse(final XMLStreamReader reader, final ModuleLoader loader, final ModuleIdentifier identifier)
-            throws XMLStreamException {
+    private static List<RemoteEjbConfig> parseEjbInjection(final XMLStreamReader reader) throws XMLStreamException, ClassNotFoundException {
 
-        reader.require(XMLStreamConstants.START_DOCUMENT, null, null);
+        List<RemoteEjbConfig> configs = new ArrayList<>();
+
+        requireNoAttributes(reader);
 
         while (reader.hasNext()) {
             switch (reader.nextTag()) {
+                case XMLStreamConstants.END_ELEMENT: {
+                    return configs;
+                }
                 case XMLStreamConstants.START_ELEMENT: {
-                    Element element = Element.forName(reader.getLocalName());
+                    String element = reader.getLocalName();
                     switch (element) {
-                        case PERMISSIONS: {
-                            return parsePermissions(reader, loader, identifier);
+                        case "ejbs" : {
+                            configs.add(parseEjbsInjection(reader));
+                            break;
                         }
                         default: {
                             throw unexpectedElement(reader);
                         }
                     }
+                    break;
                 }
                 default: {
                     throw unexpectedContent(reader);
@@ -57,49 +88,56 @@ public class RemoteEjbInjectionParser {
         throw unexpectedEndOfDocument(reader);
     }
 
-    private static List<PermissionFactory> parsePermissions(final XMLStreamReader reader, final ModuleLoader loader, final ModuleIdentifier identifier)
-            throws XMLStreamException {
+    private static RemoteEjbConfig parseEjbsInjection(final XMLStreamReader reader) throws XMLStreamException, ClassNotFoundException {
 
-        List<PermissionFactory> factories = new ArrayList<PermissionFactory>();
+        String app = null;
+        String providerUri = null;
+        String module = null;
+        String distinct = null;
+        List<RemoteEjbConfig.RemoteEjb> remoteEjbs = new ArrayList<>();
 
-        // parse the permissions attributes.
-        EnumSet<Attribute> requiredAttributes = EnumSet.of(Attribute.VERSION);
-        for (int i = 0; i < reader.getAttributeCount(); i++) {
-            final String attributeNamespace = reader.getAttributeNamespace(i);
-            if (attributeNamespace != null && !attributeNamespace.isEmpty()) {
-                continue;
-            }
-            Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
-            switch (attribute) {
-                case VERSION: {
-                    String version = reader.getAttributeValue(i);
-                    if (!"7".equals(version))
-                        throw SecurityManagerLogger.ROOT_LOGGER.invalidPermissionsXMLVersion(version, "7");
+        Set<String> required = new HashSet<>();
+        required.add(MODULE);
+        required.add(PROVIDER_URI);
+        // parse the permissions required.
+        for(int i = 0; i < reader.getAttributeCount(); ++i) {
+            String name = reader.getAttributeLocalName(i);
+            required.remove(name);
+            String value = reader.getAttributeValue(i);
+            switch (name) {
+                case MODULE: {
+                    module = value;
                     break;
                 }
-                default: {
-                    throw unexpectedAttribute(reader, i);
+                case APP: {
+                    app = value;
+                    break;
+                }
+                case DISTINCT: {
+                    distinct = value;
+                    break;
+                }
+                case PROVIDER_URI: {
+                    providerUri = value;
+                    break;
                 }
             }
-            requiredAttributes.remove(attribute);
         }
-
-        // check if all required attributes were parsed.
-        if (!requiredAttributes.isEmpty())
-            throw missingRequiredAttributes(reader, requiredAttributes);
+        if(!required.isEmpty()) {
+            throw missingRequiredAttributes(reader, required);
+        }
 
         // parse the permissions sub-elements.
         while (reader.hasNext()) {
             switch (reader.nextTag()) {
                 case XMLStreamConstants.END_ELEMENT: {
-                    return factories;
+                    return new RemoteEjbConfig(providerUri, app, module, distinct, remoteEjbs);
                 }
                 case XMLStreamConstants.START_ELEMENT: {
-                    Element element = Element.forName(reader.getLocalName());
+                    String element = reader.getLocalName();
                     switch (element) {
-                        case PERMISSION: {
-                            PermissionFactory factory = parsePermission(reader, loader, identifier);
-                            factories.add(factory);
+                        case EJB: {
+                            remoteEjbs.add(parseEjb(reader));
                             break;
                         }
                         default: {
@@ -116,46 +154,46 @@ public class RemoteEjbInjectionParser {
         throw unexpectedEndOfDocument(reader);
     }
 
-    private static PermissionFactory parsePermission(final XMLStreamReader reader, final ModuleLoader loader, final ModuleIdentifier identifier)
-            throws XMLStreamException {
+    private static RemoteEjbConfig.RemoteEjb parseEjb(XMLStreamReader reader) throws XMLStreamException, ClassNotFoundException {
 
-        // permission element has no attributes.
-        requireNoAttributes(reader);
+        String interfaceClass = null;
+        String ejbName = null;
+        List<RemoteEjbConfig.RemoteEjb> remoteEjbs = new ArrayList<>();
 
-        String permissionClass = null;
-        String permissionName = null;
-        String permissionActions = null;
+        Set<String> required = new HashSet<>();
+        required.add(INTERFACE_CLASS);
+        required.add(EJB_NAME);
+        // parse the permissions required.
+        for(int i = 0; i < reader.getAttributeCount(); ++i) {
+            String name = reader.getAttributeLocalName(i);
+            required.remove(name);
+            String value = reader.getAttributeValue(i);
+            switch (name) {
+                case INTERFACE_CLASS: {
+                    interfaceClass = value;
+                    break;
+                }
+                case EJB_NAME: {
+                    ejbName = value;
+                    break;
+                }
+            }
+        }
+        if(!required.isEmpty()) {
+            throw missingRequiredAttributes(reader, required);
+        }
 
-        EnumSet<Element> requiredElements = EnumSet.of(Element.CLASS_NAME);
+        // parse the permissions sub-elements.
         while (reader.hasNext()) {
             switch (reader.nextTag()) {
                 case XMLStreamConstants.END_ELEMENT: {
-                    // check if all required permission elements have been processed.
-                    if (!requiredElements.isEmpty())
-                        throw missingRequiredElement(reader, requiredElements);
-
-                    // build a permission and add it to the list.
-                    PermissionFactory factory = new ModularPermissionFactory(loader, identifier, permissionClass,
-                            permissionName, permissionActions);
-                    return factory;
+                    return new RemoteEjbConfig.RemoteEjb(Thread.currentThread().getContextClassLoader().loadClass(interfaceClass), ejbName);
                 }
                 case XMLStreamConstants.START_ELEMENT: {
-                    Element element = Element.forName(reader.getLocalName());
-                    requiredElements.remove(element);
+                    String element = reader.getLocalName();
                     switch (element) {
-                        case CLASS_NAME: {
-                            requireNoAttributes(reader);
-                            permissionClass = reader.getElementText();
-                            break;
-                        }
-                        case NAME: {
-                            requireNoAttributes(reader);
-                            permissionName = reader.getElementText();
-                            break;
-                        }
-                        case ACTIONS: {
-                            requireNoAttributes(reader);
-                            permissionActions = reader.getElementText();
+                        case EJB: {
+                            remoteEjbs.add(parseEjb(reader));
                             break;
                         }
                         default: {
@@ -224,7 +262,7 @@ public class RemoteEjbInjectionParser {
                 kind = "unknown";
                 break;
         }
-        return SecurityManagerLogger.ROOT_LOGGER.unexpectedContentType(kind, reader.getLocation());
+        return new XMLStreamException("Unexpected content type " + kind + " at " + reader.getLocation());
     }
 
     /**
@@ -234,7 +272,7 @@ public class RemoteEjbInjectionParser {
      * @return the constructed {@link javax.xml.stream.XMLStreamException}.
      */
     private static XMLStreamException unexpectedEndOfDocument(final XMLStreamReader reader) {
-        return SecurityManagerLogger.ROOT_LOGGER.unexpectedEndOfDocument(reader.getLocation());
+        return new XMLStreamException("Unexpected end of document at " + reader.getLocation());
     }
 
     /**
@@ -244,7 +282,7 @@ public class RemoteEjbInjectionParser {
      * @return the constructed {@link javax.xml.stream.XMLStreamException}.
      */
     private static XMLStreamException unexpectedElement(final XMLStreamReader reader) {
-        return SecurityManagerLogger.ROOT_LOGGER.unexpectedElement(reader.getName(), reader.getLocation());
+        return new XMLStreamException("Unexpected element " + reader.getName() + " at " + reader.getLocation());
     }
 
     /**
@@ -255,7 +293,7 @@ public class RemoteEjbInjectionParser {
      * @return the constructed {@link javax.xml.stream.XMLStreamException}.
      */
     private static XMLStreamException unexpectedAttribute(final XMLStreamReader reader, final int index) {
-        return SecurityManagerLogger.ROOT_LOGGER.unexpectedAttribute(reader.getAttributeName(index), reader.getLocation());
+        return new XMLStreamException("Unexpected attribute " + reader.getAttributeName(index) + " at " + reader.getLocation());
     }
 
     /**
@@ -287,157 +325,7 @@ public class RemoteEjbInjectionParser {
                 builder.append(", ");
             }
         }
-        return SecurityManagerLogger.ROOT_LOGGER.missingRequiredAttributes(builder, reader.getLocation());
+        return new XMLStreamException("Missing required attribute " + builder + " at " + reader.getLocation());
     }
 
-    /**
-     * Get an exception reporting missing required XML element(s).
-     *
-     * @param reader a reference to the stream reader.
-     * @param required a set of enums whose toString method returns the element name.
-     * @return the constructed {@link javax.xml.stream.XMLStreamException}.
-     */
-    private static XMLStreamException missingRequiredElement(final XMLStreamReader reader, final Set<?> required) {
-        final StringBuilder builder = new StringBuilder();
-        Iterator<?> iterator = required.iterator();
-        while (iterator.hasNext()) {
-            final Object o = iterator.next();
-            builder.append(o.toString());
-            if (iterator.hasNext()) {
-                builder.append(", ");
-            }
-        }
-        return SecurityManagerLogger.ROOT_LOGGER.missingRequiredElements(builder, reader.getLocation());
-    }
-
-
-    /**
-     * <p>
-     * Enumeration of the persistence.xml configuration elements.
-     * </p>
-     *
-     * @author <a href="mailto:sguilhen@redhat.com">Stefan Guilhen</a>
-     */
-    enum Element {
-
-        UNKNOWN(null),
-
-        PERMISSIONS("permissions"),
-        PERMISSION("permission"),
-        CLASS_NAME("class-name"),
-        NAME("name"),
-        ACTIONS("actions");
-
-
-        // elements used to configure the ORB.
-
-        private final String name;
-
-        /**
-         * <p>
-         * {@code Element} constructor. Sets the element name.
-         * </p>
-         *
-         * @param name a {@code String} representing the local name of the element.
-         */
-        Element(final String name) {
-            this.name = name;
-        }
-
-        /**
-         * <p>
-         * Obtains the local name of this element.
-         * </p>
-         *
-         * @return a {@code String} representing the element's local name.
-         */
-        public String getLocalName() {
-            return name;
-        }
-
-        // a map that caches all available elements by name.
-        private static final Map<String, Element> MAP;
-
-        static {
-            final Map<String, Element> map = new HashMap<String, Element>();
-            for (Element element : values()) {
-                final String name = element.getLocalName();
-                if (name != null)
-                    map.put(name, element);
-            }
-            MAP = map;
-        }
-
-
-        /**
-         * <p>
-         * Gets the {@code Element} identified by the specified name.
-         * </p>
-         *
-         * @param localName a {@code String} representing the local name of the element.
-         * @return the {@code Element} identified by the name. If no attribute can be found, the {@code Element.UNKNOWN}
-         *         type is returned.
-         */
-        public static Element forName(String localName) {
-            final Element element = MAP.get(localName);
-            return element == null ? UNKNOWN : element;
-        }
-
-    }
-
-    enum Attribute {
-        UNKNOWN(null),
-        VERSION("version");
-
-        private final String name;
-
-        /**
-         * <p>
-         * {@code Attribute} constructor. Sets the attribute name.
-         * </p>
-         *
-         * @param name a {@code String} representing the local name of the attribute.
-         */
-        Attribute(final String name) {
-            this.name = name;
-        }
-
-        /**
-         * <p>
-         * Obtains the local name of this attribute.
-         * </p>
-         *
-         * @return a {@code String} representing the attribute local name.
-         */
-        public String getLocalName() {
-            return this.name;
-        }
-
-        // a map that caches all available attributes by name.
-        private static final Map<String, Attribute> MAP;
-
-        static {
-            final Map<String, Attribute> map = new HashMap<String, Attribute>();
-            for (Attribute attribute : values()) {
-                final String name = attribute.name;
-                if (name != null)
-                    map.put(name, attribute);
-            }
-            MAP = map;
-        }
-
-        /**
-         * <p>
-         * Gets the {@code Attribute} identified by the specified name.
-         * </p>
-         *
-         * @param localName a {@code String} representing the local name of the attribute.
-         * @return the {@code Attribute} identified by the name. If no attribute can be found, the {@code Attribute.UNKNOWN}
-         *         type is returned.
-         */
-        public static Attribute forName(String localName) {
-            final Attribute attribute = MAP.get(localName);
-            return attribute == null ? UNKNOWN : attribute;
-        }
-    }
 }

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ejb-injection xmlns="urn:jboss:remote-ejb-injection:1.0">
+    <ejbs provider-uri="http://localhost:8080/wildfly-services" module="mymodule" app="myapp" distinct="mydistinct">
+        <ejb interface-class="org.wildfly.remoteejbinjection.ejbs.StatelessEjbInterface" ejb-name="MyEjb" />
+    </ejbs>
+    <ejbs provider-uri="http://localhost:8080/wildfly-services" module="othermodule" app="otherapp" distinct="otherdistinct">
+        <ejb interface-class="org.wildfly.remoteejbinjection.ejbs.StatelessEjbInterface" ejb-name="OtherEjb" />
+    </ejbs>
+</ejb-injection>

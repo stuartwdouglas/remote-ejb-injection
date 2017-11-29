@@ -29,27 +29,28 @@
             attributeFormDefault="unqualified"
             version="1.0">
 
-    <!-- Root element -->
     <xsd:element name="ejb-injection" type="ejbInjectionType"/>
 
     <xsd:complexType name="ejbInjectionType">
         <xsd:sequence>
-            <xsd:element name="lookup-uri" type="xsd:string" minOccurs="0" maxOccurs="1"/>
-            <xsd:element name="ejbs" type="ejbsType" minOccurs="1" maxOccurs="1"/>
-
+            <xsd:element name="ejbs" type="ejbsType" minOccurs="1" maxOccurs="unbounded"/>
         </xsd:sequence>
     </xsd:complexType>
 
     <xsd:complexType name="ejbsType">
         <xsd:sequence>
-            <xsd:element name="ejb" type="ejbType" minOccurs="0" maxOccurs="unbounded"/>
+            <xsd:element name="ejb" type="ejbType" minOccurs="1" maxOccurs="unbounded"/>
         </xsd:sequence>
+        <xsd:attribute name="provider-uri" type="xsd:string" use="required"/>
+        <xsd:attribute name="module" type="xsd:token" use="required"/>
+        <xsd:attribute name="app" type="xsd:token"/>
+        <xsd:attribute name="distinct" type="xsd:token"/>
     </xsd:complexType>
 
 
     <xsd:complexType name="ejbType">
-        <xsd:attribute name="class-name" type="xsd:token" use="required" />
-        <xsd:attribute name="lookup" type="xsd:token" use="required" />
+        <xsd:attribute name="interface-class" type="xsd:token" use="required"/>
+        <xsd:attribute name="ejb-name" type="xsd:string" use="required"/>
     </xsd:complexType>
 </xsd:schema>
 
